@@ -10,13 +10,18 @@ class LiteClient:
         self.log.log(self.__class__.__name__, 3, 'liteServer address: ' + self.ls_addr)
         self.log.log(self.__class__.__name__, 3, 'liteServer key    : ' + self.ls_key)
 
-    def exec(self, cmd):
+    def exec(self, cmd, nothrow = False):
         self.log.log(self.__class__.__name__, 3, 'Executing command : ' + cmd)
         args = [self.config["bin"],
                 "--addr", self.ls_addr,
                 "--b64", self.ls_key,
                 "--verbosity", "0",
                 "--cmd", cmd]
+
+        if nothrow:
+            process = subprocess.run(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                     timeout=self.config["timeout"])
+            return process.stdout.decode("utf-8")
 
         success = False
         output = None
@@ -25,6 +30,7 @@ class LiteClient:
                 process = subprocess.run(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                      timeout=self.config["timeout"])
                 output = process.stdout.decode("utf-8")
+                stderr = process.stderr.decode("utf-8")
                 if process.returncode == 0:
                     success = True
                     continue

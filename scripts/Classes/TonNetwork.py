@@ -40,6 +40,28 @@ class TonNetwork:
             self.log.log(self.__class__.__name__, 3, "Result: '{}'".format(res))
             return res
 
+    def check_block_known(self, blockinfo):
+        self.log.log(self.__class__.__name__, 3, "Checking for presence of block '{}'".format(blockinfo))
+
+        self.log.log(self.__class__.__name__, 3, "Validate LS connectivity.")
+        if not self.get_last():
+            self.log.log(self.__class__.__name__, 1, "Could not validate LS")
+            return None
+
+        try:
+            stdout = self.lc.exec('gethead {}'.format(blockinfo), True)
+        except Exception as e:
+            self.log.log(self.__class__.__name__, 1, "Could not execute `gethead`: " + str(e))
+            return None
+
+        match = re.search(r'^(block header.+).+', stdout, re.MULTILINE)
+        if (match):
+            self.log.log(self.__class__.__name__, 3, "Block is known!")
+            return 1
+        else:
+            self.log.log(self.__class__.__name__, 3, "Unknown block!")
+            return 0
+
     def parse_block_info(self, as_string):
         match = re.match(r'\((-?\d*),(\d*),(\d*)\)|(\w*):(\w*).+', as_string, re.M | re.I)
         if match:
