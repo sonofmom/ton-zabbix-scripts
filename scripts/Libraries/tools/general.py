@@ -22,5 +22,8 @@ def check_file_writable(file):
 def get_datetime_string(timestamp=time.time()):
     return time.strftime("%d.%m.%Y %H:%M:%S %Z", time.localtime(timestamp))
 
+def get_timestamp():
+    return round(time.time())
+
 def console_log(message):
     print("{}: {}".format(get_datetime_string(time.time()), message))
