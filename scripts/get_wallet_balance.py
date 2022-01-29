@@ -38,7 +38,7 @@ def run():
         sys.exit(1)
 
     if result["ok"] != True:
-        cfg.log.log(os.path.basename(__file__), 1, 'Could not retrieve information.')
+        cfg.log.log(os.path.basename(__file__), 1, "Could not retrieve information: {}".format(result["error"]))
         sys.exit(1)
 
     if cfg.args.get_time:
