@@ -7,6 +7,7 @@ import argparse
 import datetime
 import time
 import Libraries.arguments as ar
+import Libraries.tools.general as gt
 import Classes.AppConfig as AppConfig
 import requests
 import json
@@ -22,7 +23,14 @@ def run():
                         default='block',
                         dest='metric',
                         action='store',
-                        help='Metric type, one of block|time|age. Default value: block')
+                        help='Metric type, one of block|time|age|rate. Default value: block')
+    parser.add_argument('-r', '--ratefile',
+                        required=False,
+                        type=str,
+                        default='/tmp/ton_cbr.json',
+                        dest='ratefile',
+                        action='store',
+                        help='Rate file, to store last rate query. Default value: /tmp/ton_cbr.json')
     cfg = AppConfig.AppConfig(parser.parse_args())
 
     cfg.log.log(os.path.basename(__file__), 3, "Executing getConsensusBlock.")
@@ -56,6 +64,33 @@ def run():
             if result < 0:
                 result = 0
             print(result)
+        elif cfg.args.metric == 'rate':
+            rate = 0
+            cfg.log.log(os.path.basename(__file__), 3, "Checking for presence of rate file '{}'.".format(cfg.args.ratefile))
+            if gt.check_file_exists(cfg.args.ratefile):
+                cfg.log.log(os.path.basename(__file__), 3, "Loading and parsing file '{}'.".format(cfg.args.ratefile))
+                try:
+                    fh = open(cfg.args.ratefile, 'r')
+                    prev_result = json.loads(fh.read())
+                    fh.close()
+
+                    seconds = time.mktime(datetime.datetime.now().timetuple()) - prev_result["result"]["timestamp"]
+                    blocks = result["result"]["consensus_block"] - prev_result["result"]["consensus_block"]
+                    rate = blocks / seconds
+                except Exception as e:
+                    cfg.log.log(os.path.basename(__file__), 1, "Could not load and parse rate file: " + str(e))
+            else:
+                cfg.log.log(os.path.basename(__file__), 3, "File not found.")
+
+            try:
+                fh = open(cfg.args.ratefile, 'w')
+                fh.write(json.dumps(result, indent=4, sort_keys=True))
+                fh.close()
+            except Exception as e:
+                cfg.log.log(os.path.basename(__file__), 1, "Could not write rate file: " + str(e))
+
+            print(rate)
+
         else:
             print(int(result["result"]["consensus_block"]))
 
