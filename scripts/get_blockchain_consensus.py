@@ -76,7 +76,8 @@ def run():
 
                     seconds = time.mktime(datetime.datetime.now().timetuple()) - prev_result["result"]["timestamp"]
                     blocks = result["result"]["consensus_block"] - prev_result["result"]["consensus_block"]
-                    rate = blocks / seconds
+                    if blocks and seconds:
+                        rate = blocks / seconds
                 except Exception as e:
                     cfg.log.log(os.path.basename(__file__), 1, "Could not load and parse rate file: " + str(e))
             else:
