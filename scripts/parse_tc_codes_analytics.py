@@ -34,7 +34,7 @@ def run():
                         action='store',
                         help='Verbosity 0 - 3')
 
-    parser.add_argument('codegroup', nargs=1, help='Code group to parse (2|3|4|5) - REQUIRED')
+    parser.add_argument('code_range', nargs=2, help='Code range <from> <to> - REQUIRED')
     args = parser.parse_args()
 
     log = Logger(args.verbosity)
@@ -59,10 +59,9 @@ def run():
         sys.exit(1)
 
     count = 0
-    rs = int(args.codegroup[0]) * 100
-    log.log(os.path.basename(__file__), 3, "Looking for codes in range {}-{}".format(rs, rs+99))
+    log.log(os.path.basename(__file__), 3, "Looking for codes in range {}-{}".format(args.code_range[0], args.code_range[1]))
     for element in analytics:
-        if element["status_code"] >= rs and element["status_code"] <= (rs+99):
+        if element["status_code"] >= int(args.code_range[0]) and element["status_code"] <= int(args.code_range[1]):
             count += int(element["count"])
 
     print(count)
