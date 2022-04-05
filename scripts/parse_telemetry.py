@@ -105,6 +105,8 @@ def run():
         else:
             log.log(os.path.basename(__file__), 3, "Keys return requested but result data is neither list or dictionary")
             sys.exit(1)
+    elif isinstance(result, bool):
+        print(int(result))
     else:
         print(result)
 
