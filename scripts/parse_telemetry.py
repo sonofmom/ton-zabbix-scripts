@@ -95,16 +95,22 @@ def run():
     if args.check == 1:
         print(1)
     elif args.keys == 1:
+        keys = []
         if isinstance(result, dict):
-            print(list(result.keys()))
+            keys = list(result.keys())
         elif isinstance(result, list):
-            indexes = []
             for x in range(len(result)):
-                indexes.append(x)
-            print(indexes)
+                keys.append(x)
         else:
             log.log(os.path.basename(__file__), 3, "Keys return requested but result data is neither list or dictionary")
             sys.exit(1)
+
+        result = []
+        for key in keys:
+            result.append({"{#DISKNAME}": key})
+
+        print(result)
+
     elif isinstance(result, bool):
         print(int(result))
     else:
