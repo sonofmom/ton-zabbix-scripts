@@ -109,7 +109,7 @@ def run():
         for key in keys:
             result.append({"{#DISKNAME}": key})
 
-        print(result)
+        print(json.dumps(result))
 
     elif isinstance(result, bool):
         print(int(result))
