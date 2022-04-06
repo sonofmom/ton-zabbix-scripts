@@ -5,6 +5,7 @@ import sys
 import os
 import argparse
 import Libraries.tools.general as gt
+import Libraries.arguments as ar
 from Classes.Logger import Logger
 import json
 
@@ -12,28 +13,7 @@ def run():
     description = 'Parses TON telemetry JSON and returns result.'
     parser = argparse.ArgumentParser(formatter_class = argparse.RawDescriptionHelpFormatter,
                                     description = description)
-    parser.add_argument('-f', '--file',
-                        required=True,
-                        dest='file',
-                        action='store',
-                        help='File containing telemetry information - REQUIRED')
-
-    parser.add_argument('-m', '--maxage',
-                        required=False,
-                        type=int,
-                        default=300,
-                        dest='maxage',
-                        action='store',
-                        help='Maximum age of telemetry file in seconds - OPTIONAL')
-
-    parser.add_argument('-v', '--verbosity',
-                        required=False,
-                        type=int,
-                        default=0,
-                        dest='verbosity',
-                        action='store',
-                        help='Verbosity 0 - 3')
-
+    ar.set_standard_args_file(parser)
     parser.add_argument('-c', '--check',
                         required=False,
                         type=int,
@@ -72,7 +52,7 @@ def run():
         telemetry = json.loads(fh.read())
         fh.close()
     except Exception as e:
-        log.log(os.path.basename(__file__), 1, "Configuration file read error: " + str(e))
+        log.log(os.path.basename(__file__), 1, "Data file read error: " + str(e))
         sys.exit(1)
 
     log.log(os.path.basename(__file__), 3, "Looking for ADNL '{}'".format(args.adnl[0]))

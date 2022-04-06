@@ -35,3 +35,26 @@ def set_standard_args_ls(parser):
                         dest='ls_key',
                         action='store',
                         help='LiteServer base64 key as encoded in network config - REQUIRED')
+
+def set_standard_args_file(parser):
+    parser.add_argument('-f', '--file',
+                        required=True,
+                        dest='file',
+                        action='store',
+                        help='File containing data - REQUIRED')
+
+    parser.add_argument('-m', '--maxage',
+                        required=False,
+                        type=int,
+                        default=300,
+                        dest='maxage',
+                        action='store',
+                        help='Maximum age of data file in seconds - OPTIONAL')
+
+    parser.add_argument('-v', '--verbosity',
+                        required=False,
+                        type=int,
+                        default=0,
+                        dest='verbosity',
+                        action='store',
+                        help='Verbosity 0 - 3')
