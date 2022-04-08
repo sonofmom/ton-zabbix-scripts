@@ -89,7 +89,7 @@ def run():
 
         result = []
         for key in keys:
-            result.append({"{#DISKNAME}": key})
+            result.append({"{#KEYNAME}": key})
 
         print(json.dumps(result))
 
