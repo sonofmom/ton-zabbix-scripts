@@ -1,0 +1,19 @@
+{
+  "elections": {
+    "url": "https://elections.toncenter.com"
+  },
+  "zabbix": {
+    "url": "https://zabbix.host/api_jsonrpc.php",
+    "api_token": "changeme"
+  },
+  "mapping": {
+    "groups": {
+      "ton_nodes": 31,
+      "ton_validators": 32
+    },
+    "templates": {
+      "ton_node_telemetry": 10531,
+      "ton_node_validator": 10533
+    }
+  }
+}

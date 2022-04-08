@@ -4,11 +4,10 @@
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-#pwd = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-#sys.path.append("{}/scripts".format(pwd))
 
 import argparse
 import datetime
+import time
 import requests
 import Libraries.arguments as ar
 import Classes.AppConfig as AppConfig
@@ -21,7 +20,7 @@ def run():
     parser = argparse.ArgumentParser(formatter_class = argparse.RawDescriptionHelpFormatter,
                                     description = description)
     ar.set_standard_args(parser)
-    parser.add_argument('period', nargs=1, help='Period to fetch, in seconds - REQUIRED')
+    parser.add_argument('period', nargs=1, help='Max period to fetch, in seconds - REQUIRED')
 
     cfg = AppConfig.AppConfig(parser.parse_args())
     lc = LiteClient.LiteClient(cfg.args, cfg.config["liteClient"], cfg.log)
@@ -30,9 +29,9 @@ def run():
     start_time = datetime.datetime.now()
     cfg.log.log(os.path.basename(__file__), 3, 'Fetching validation cycles list from elections server')
     try:
-        rs = requests.get("https://elections.toncenter.com/getValidationCycles?return_participants=true&offset=0&limit=2").json()
+        rs = requests.get("{}/getValidationCycles?return_participants=true&offset=0&limit=2".format(cfg.config["elections"]["url"])).json()
     except Exception as e:
-        cfg.log.log(os.path.basename(__file__), 1, "Could not elections request: " + str(e))
+        cfg.log.log(os.path.basename(__file__), 1, "Could not perform elections request: " + str(e))
         sys.exit(1)
 
     cfg.log.log(os.path.basename(__file__), 3, "Looking for active cycle")
@@ -48,8 +47,17 @@ def run():
         cfg.log.log(os.path.basename(__file__), 1, "Could not find active validation cycle")
         sys.exit(1)
 
+    cfg.log.log(os.path.basename(__file__), 3, 'Calculating maximum possible period for current cycle')
+    t_now = int(time.time())
+    t_max = t_now - vdata["cycle_info"]["utime_since"]
+    t_period = int(cfg.args.period[0])
+    cfg.log.log(os.path.basename(__file__), 3, '{} - {} = {} seconds'.format(t_now,vdata["cycle_info"]["utime_since"],t_max))
+    if t_period > t_max:
+        t_period = t_max
+
+    cfg.log.log(os.path.basename(__file__), 3, 'Using period of {} seconds'.format(t_period))
     cfg.log.log(os.path.basename(__file__), 3, 'Fetching validators load from blockchain')
-    result = tn.get_validators_load(cfg.args.period[0])
+    result = tn.get_validators_load((t_now-t_period),t_now)
 
     cfg.log.log(os.path.basename(__file__), 3, 'Mapping ADNLs to PUBKEYS for result')
     for i in range(len(result)):

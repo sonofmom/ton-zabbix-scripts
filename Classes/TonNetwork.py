@@ -1,8 +1,5 @@
 import re
-#import subprocess
-#import sys
-#import time
-import datetime
+
 
 class TonNetwork:
     def __init__(self, lite_client, log):
@@ -84,11 +81,9 @@ class TonNetwork:
         value = self.lc.get_var(grams, "value")
         return self.ng2g(value)
 
-    def get_validators_load(self, period):
-        dt = datetime.datetime.now(datetime.timezone.utc)
-        t_end = int(dt.replace(tzinfo=datetime.timezone.utc).timestamp())
-        t_start = t_end - int(period)
-        output = self.lc.exec('checkloadall {} {}'.format(t_start, t_end), wait=10)
+    def get_validators_load(self, t_start, t_end):
+        cmd = 'checkloadall {} {}'.format(t_start, t_end)
+        output = self.lc.exec(cmd, wait=10)
 
         ## Following code base on mytonctrl (https://github.com/ton-blockchain/mytonctrl)
         lines = output.split('\n')

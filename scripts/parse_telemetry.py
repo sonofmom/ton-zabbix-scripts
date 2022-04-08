@@ -60,7 +60,11 @@ def run():
     log.log(os.path.basename(__file__), 3, "Looking for ADNL '{}'".format(args.adnl[0]))
     adnl_data = next((chunk for chunk in telemetry if chunk["adnl_address"] == args.adnl[0]), None)
     if not adnl_data:
-        log.log(os.path.basename(__file__), 2, "Data for ADNL '{}' not found".format(args.adnl[0]))
+        log.log(os.path.basename(__file__), 1, "Data for ADNL '{}' not found".format(args.adnl[0]))
+        if args.check == 1:
+            print(0)
+            sys.exit(0)
+
         sys.exit(1)
 
     log.log(os.path.basename(__file__), 3, "Looking for path '{}'".format(args.path[0]))

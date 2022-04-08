@@ -25,6 +25,7 @@ def get_datetime_string(timestamp=time.time()):
 def get_timestamp():
     return round(time.time())
 
+
 def get_leaf(data, path):
     result = None
     if isinstance(data, dict):

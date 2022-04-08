@@ -16,6 +16,13 @@ def run():
     parser = argparse.ArgumentParser(formatter_class = argparse.RawDescriptionHelpFormatter,
                                     description = description)
     ar.set_standard_args_file(parser)
+    parser.add_argument('-c', '--check',
+                        required=False,
+                        type=int,
+                        default=0,
+                        dest='check',
+                        action='store',
+                        help='Check existence of requested path, return 1 if exists, 0 if not')
 
     parser.add_argument('adnl', nargs=1, help='ADNL to retrieve - REQUIRED')
     parser.add_argument('path', nargs=1, help='Data path to retrieve - REQUIRED')
@@ -46,7 +53,11 @@ def run():
     adnl_data = next((chunk for chunk in data if chunk["adnl_addr"] == args.adnl[0]), None)
     if not adnl_data:
         log.log(os.path.basename(__file__), 2, "Data for ADNL '{}' not found".format(args.adnl[0]))
-        sys.exit(1)
+        if (args.check):
+            print(0)
+            sys.exit(0)
+        else:
+            sys.exit(1)
 
     log.log(os.path.basename(__file__), 3, "Looking for path '{}'".format(args.path[0]))
     result = gt.get_leaf(adnl_data, args.path[0].split('.'))
