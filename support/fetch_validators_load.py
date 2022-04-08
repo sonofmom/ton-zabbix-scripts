@@ -3,11 +3,13 @@
 
 import sys
 import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+#pwd = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+#sys.path.append("{}/scripts".format(pwd))
+
 import argparse
 import datetime
-
 import requests
-
 import Libraries.arguments as ar
 import Classes.AppConfig as AppConfig
 import Classes.LiteClient as LiteClient
