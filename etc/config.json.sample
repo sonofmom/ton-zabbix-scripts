@@ -3,5 +3,11 @@
     "bin": "/opt/ton-zabbix-scripts/bin/ubuntu20/lite-client",
     "timeout": 5,
     "retries": 1
+  },
+  "toncenter": {
+    "url": "https://wallet.toncenter.com/api/v2/jsonRPC"
+  },
+  "elections": {
+    "url": "https://elections.toncenter.com"
   }
 }

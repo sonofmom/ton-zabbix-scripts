@@ -54,16 +54,15 @@ def run():
 
     cfg.log.log(os.path.basename(__file__), 3, "Checking for nodes not known to zabbix")
     for element in validators:
-        if element["adnl_addr"] not in hdata:
-            cfg.log.log(os.path.basename(__file__), 3, "Adding node {}.".format(element["adnl_addr"]))
-            rs = add_node(cfg,element["adnl_addr"],
+        if element not in hdata:
+            cfg.log.log(os.path.basename(__file__), 3, "Adding node {}.".format(element))
+            rs = add_node(cfg,element,
                          [
                              cfg.config["mapping"]["groups"]["ton_validators"]
                          ], [
                              cfg.config["mapping"]["templates"]["ton_node_telemetry"],
                              cfg.config["mapping"]["templates"]["ton_node_validator"],
                          ])
-
             if not rs:
                 cfg.log.log(os.path.basename(__file__), 1, "Could not add host.")
                 sys.exit(1)
