@@ -1,4 +1,6 @@
 import subprocess
+import time
+
 
 class LiteClient:
     def __init__(self, args, config, log):
@@ -10,7 +12,7 @@ class LiteClient:
         self.log.log(self.__class__.__name__, 3, 'liteServer address: ' + self.ls_addr)
         self.log.log(self.__class__.__name__, 3, 'liteServer key    : ' + self.ls_key)
 
-    def exec(self, cmd, nothrow = False):
+    def exec(self, cmd, nothrow = False, wait = None):
         self.log.log(self.__class__.__name__, 3, 'Executing command : ' + cmd)
         args = [self.config["bin"],
                 "--addr", self.ls_addr,
@@ -31,6 +33,8 @@ class LiteClient:
                                      timeout=self.config["timeout"])
                 output = process.stdout.decode("utf-8")
                 stderr = process.stderr.decode("utf-8")
+                if wait:
+                    time.sleep(wait)
                 if process.returncode == 0:
                     success = True
                     continue

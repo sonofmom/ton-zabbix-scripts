@@ -1,7 +1,8 @@
 import re
-import subprocess
-import sys
-import time
+#import subprocess
+#import sys
+#import time
+import datetime
 
 class TonNetwork:
     def __init__(self, lite_client, log):
@@ -82,6 +83,76 @@ class TonNetwork:
         grams = self.lc.get_var(balance, "grams")
         value = self.lc.get_var(grams, "value")
         return self.ng2g(value)
+
+    def get_validators_load(self, period):
+        dt = datetime.datetime.now(datetime.timezone.utc)
+        t_end = int(dt.replace(tzinfo=datetime.timezone.utc).timestamp())
+        t_start = t_end - int(period)
+        output = self.lc.exec('checkloadall {} {}'.format(t_start, t_end), wait=10)
+
+        ## Following code base on mytonctrl (https://github.com/ton-blockchain/mytonctrl)
+        lines = output.split('\n')
+        data = list()
+        for line in lines:
+            if "val" in line and "pubkey" in line:
+                buff = line.split(' ')
+                vid = buff[1]
+                vid = vid.replace('#', '')
+                vid = vid.replace(':', '')
+                vid = int(vid)
+                pubkey = buff[3]
+                pubkey = pubkey.replace(',', '')
+                blocksCreated_buff = buff[6]
+                blocksCreated_buff = blocksCreated_buff.replace('(', '')
+                blocksCreated_buff = blocksCreated_buff.replace(')', '')
+                blocksCreated_buff = blocksCreated_buff.split(',')
+                masterBlocksCreated = float(blocksCreated_buff[0])
+                workBlocksCreated = float(blocksCreated_buff[1])
+                blocksExpected_buff = buff[8]
+                blocksExpected_buff = blocksExpected_buff.replace('(', '')
+                blocksExpected_buff = blocksExpected_buff.replace(')', '')
+                blocksExpected_buff = blocksExpected_buff.split(',')
+                masterBlocksExpected = float(blocksExpected_buff[0])
+                workBlocksExpected = float(blocksExpected_buff[1])
+                if masterBlocksExpected == 0:
+                    mr = 0
+                else:
+                    mr = masterBlocksCreated / masterBlocksExpected
+                if workBlocksExpected == 0:
+                    wr = 0
+                else:
+                    wr = workBlocksCreated / workBlocksExpected
+                r = (mr + wr) / 2
+                efficiency = round(r * 100, 2)
+                if efficiency > 10:
+                    online = True
+                else:
+                    online = False
+                item = dict()
+                item["id"] = vid
+                item["pubkey"] = pubkey
+                item["masterBlocksCreated"] = masterBlocksCreated
+                item["workBlocksCreated"] = workBlocksCreated
+                item["masterBlocksExpected"] = masterBlocksExpected
+                item["workBlocksExpected"] = workBlocksExpected
+                item["mr"] = mr
+                item["wr"] = wr
+                item["efficiency"] = efficiency
+                item["online"] = online
+
+                # Get complaint file
+                index = lines.index(line)
+                nextIndex = index + 2
+                if nextIndex < len(lines):
+                    nextLine = lines[nextIndex]
+                    if "COMPLAINT_SAVED" in nextLine:
+                        buff = nextLine.split('\t')
+                        item["var1"] = buff[1]
+                        item["var2"] = buff[2]
+                        item["fileName"] = buff[3]
+                data.append(item)
+        # end for
+        return data
 
     def ng2g(self, grams):
         return int(grams)/10**9
