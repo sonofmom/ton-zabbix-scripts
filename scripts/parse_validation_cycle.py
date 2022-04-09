@@ -80,13 +80,14 @@ def run():
 
     if result is None:
         log.log(os.path.basename(__file__), 1, "Path '{}' was not found in data".format(args.path[0]))
-        if (args.check):
+        if args.check:
             print(0)
             sys.exit(0)
         else:
             sys.exit(1)
-
-    if isinstance(result, bool):
+    elif args.check:
+        print(1)
+    elif isinstance(result, bool):
         print(int(result))
     else:
         print(result)
