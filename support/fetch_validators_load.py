@@ -20,6 +20,13 @@ def run():
     parser = argparse.ArgumentParser(formatter_class = argparse.RawDescriptionHelpFormatter,
                                     description = description)
     ar.set_standard_args(parser)
+    parser.add_argument('-o', '--output',
+                        required=False,
+                        type=str,
+                        default=None,
+                        dest='output',
+                        action='store',
+                        help='Write output to indicated file instead of stdout')
     parser.add_argument('period', nargs=1, help='Max period to fetch, in seconds - REQUIRED')
 
     cfg = AppConfig.AppConfig(parser.parse_args())
@@ -73,7 +80,12 @@ def run():
     elif cfg.args.get_time:
         print(runtime.microseconds/1000)
     else:
-        print(json.dumps(result))
+        if cfg.args.output:
+            f = open(cfg.args.output, "w")
+            f.write(json.dumps(result))
+            f.close()
+        else:
+            print(json.dumps(result))
 
 if __name__ == '__main__':
     run()
