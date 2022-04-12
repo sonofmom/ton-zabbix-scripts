@@ -1,4 +1,5 @@
 {
+  "net": "mainnet",
   "elections": {
     "url": "https://elections.toncenter.com"
   },
@@ -6,14 +7,23 @@
     "url": "https://zabbix.host/api_jsonrpc.php",
     "api_token": "changeme"
   },
+  "configs": {
+    "global_public": "https://ton.org/global-config.json"
+  },
+  "thresholds": {
+    "stale_validators_disable": 131072,
+    "stale_validators_remove": 262144
+  },
   "mapping": {
     "groups": {
       "ton_nodes": 31,
-      "ton_validators": 32
+      "ton_validators": 32,
+      "ton_public_dht_servers": 26
     },
     "templates": {
       "ton_node_telemetry": 10531,
-      "ton_node_validator": 10533
+      "ton_node_validator": 10533,
+      "ton_dht_server": 10511
     }
   }
 }

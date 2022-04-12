@@ -1,5 +1,6 @@
 import os
 import time
+import sys, socket, struct
 
 def check_path_writable(path):
     if os.path.exists(path) and os.path.isdir(path) and os.access(path, os.W_OK):
@@ -42,6 +43,14 @@ def get_leaf(data, path):
             result = get_leaf(result, path[1:])
 
     return result
+
+
+def dec2ip(value):
+    return socket.inet_ntoa(struct.pack('>i', int(value)))
+
+def ip2dec(value):
+    return struct.unpack('>i',socket.inet_aton(value))[0]
+
 
 
 def console_log(message):
