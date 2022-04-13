@@ -86,10 +86,21 @@ def run():
             if cfg.config["mapping"]["groups"]["ton_nodes"] not in host["groups"]:
                 host["groups"].append(cfg.config["mapping"]["groups"]["ton_nodes"])
 
+            last_cycle_id = next((chunk for chunk in host["macros"] if chunk["macro"] == "{$LAST.CYCLE.ID}"), None)
+            if last_cycle_id and (gt.get_timestamp() - int(last_cycle_id["value"])) >= cfg.config["thresholds"]["stale_validators_remove"]:
+                cfg.log.log(os.path.basename(__file__), 3, "Node {} is ripe for removal".format(adnl))
+                zt.delete_host(cfg, host)
+                continue
+            elif last_cycle_id and (gt.get_timestamp() - int(last_cycle_id["value"])) >= cfg.config["thresholds"]["stale_validators_disable"]:
+                if int(host["status"]) == 0:
+                    cfg.log.log(os.path.basename(__file__), 3, "Node {} is ripe for disabling".format(adnl))
+                    host["status"] = '1'
+
         if host != hdata[adnl]:
             cfg.log.log(os.path.basename(__file__), 3, "Updating node {}.".format(adnl))
             zt.update_host(cfg, host, hdata[adnl])
             stats["hosts_updated"] += 1
+
 
     cfg.log.log(os.path.basename(__file__), 2, "Run completed, added: {}, updated: {}".format(stats["hosts_added"],stats["hosts_updated"]))
     sys.exit(0)

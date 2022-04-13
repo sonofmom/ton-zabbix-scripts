@@ -125,6 +125,24 @@ def update_host(cfg, host, original):
 
     return True
 
+def delete_host(cfg, host):
+    cfg.log.log(os.path.basename(__file__), 3, "Deleting host with ID {}".format(host["hostid"]))
+
+    payload = {
+        "jsonrpc": "2.0",
+        "method": "host.delete",
+        "params": [host["hostid"]],
+        "auth": cfg.config["zabbix"]["api_token"],
+        "id": 1
+    }
+
+    rs = execute_api_query(cfg, payload)
+    if not rs:
+        cfg.log.log(os.path.basename(__file__), 1, "Failed to delete host with hostid {}".format(host["hostid"]))
+        return None
+
+    return rs
+
 def set_tag(tags, id, value):
     i = next((index for (index, chunk) in enumerate(tags) if chunk["tag"] == id), None)
     if (i):
