@@ -12,7 +12,6 @@ import Libraries.tools.general as gt
 import Libraries.tools.zabbix as zt
 import Classes.AppConfig as AppConfig
 import requests
-import json
 
 def run():
     description = 'Fetches actual list of validators and performs sync with zabbix'
@@ -29,13 +28,13 @@ def run():
     }
 
     cfg.log.log(os.path.basename(__file__), 3, "Fetching current validation cycle.")
-    rs = fetch_validation_cycle(cfg)
-    if not rs:
+    cycle = fetch_validation_cycle(cfg)
+    if not cycle:
         cfg.log.log(os.path.basename(__file__), 1, "Could not find active validation cycle.")
         sys.exit(1)
 
     validators = {}
-    for element in rs["cycle_info"]["validators"]:
+    for element in cycle["cycle_info"]["validators"]:
         validators[element["adnl_addr"]] = element["wallet_address"]
 
     stats["validators"] = len(validators)
@@ -53,16 +52,17 @@ def run():
     cfg.log.log(os.path.basename(__file__), 3, "Retrieved {} hosts.".format(stats["hosts_known"]))
 
     cfg.log.log(os.path.basename(__file__), 3, "Checking for nodes not known to zabbix")
-    for element in validators:
-        if element not in hdata:
-            cfg.log.log(os.path.basename(__file__), 3, "Adding node {}.".format(element))
-            rs = add_node(cfg, element, validators[element],
+    for adnl in validators:
+        if adnl not in hdata:
+            cfg.log.log(os.path.basename(__file__), 3, "Adding node {}.".format(adnl))
+            rs = add_node(cfg, adnl, validators[adnl],
                          [
                              cfg.config["mapping"]["groups"]["ton_validators"]
                          ], [
                              cfg.config["mapping"]["templates"]["ton_node_telemetry"],
                              cfg.config["mapping"]["templates"]["ton_node_validator"],
-                         ])
+                         ],
+                          cycle["cycle_id"])
             if not rs:
                 cfg.log.log(os.path.basename(__file__), 1, "Could not add host.")
                 sys.exit(1)
@@ -70,25 +70,25 @@ def run():
             stats["hosts_added"] += 1
 
     cfg.log.log(os.path.basename(__file__), 3, "Scanning existing nodes")
-    for element in hdata:
-        groups = hdata[element]["groups"].copy()
-        tags   = hdata[element]["tags"].copy()
-        if element in validators:
-            if cfg.config["mapping"]["groups"]["ton_nodes"] in groups:
-                groups.remove(cfg.config["mapping"]["groups"]["ton_nodes"])
-            if cfg.config["mapping"]["groups"]["ton_validators"] not in groups:
-                groups.append(cfg.config["mapping"]["groups"]["ton_validators"])
-            zt.set_tag(tags, "c_wallet", validators[element])
-
+    for adnl in hdata:
+        host = hdata[adnl].copy()
+        if adnl in validators:
+            if cfg.config["mapping"]["groups"]["ton_nodes"] in host["groups"]:
+                host["groups"].remove(cfg.config["mapping"]["groups"]["ton_nodes"])
+            if cfg.config["mapping"]["groups"]["ton_validators"] not in host["groups"]:
+                host["groups"].append(cfg.config["mapping"]["groups"]["ton_validators"])
+            zt.set_tag(host["tags"], "c_wallet", validators[adnl])
+            zt.set_macro(host["macros"], "{$LAST.CYCLE.ID}", str(cycle["cycle_id"]))
+            host["status"] = '0'
         else:
-            if cfg.config["mapping"]["groups"]["ton_validators"] in groups:
-                groups.remove(cfg.config["mapping"]["groups"]["ton_validators"])
-            if cfg.config["mapping"]["groups"]["ton_nodes"] not in groups:
-                groups.append(cfg.config["mapping"]["groups"]["ton_nodes"])
+            if cfg.config["mapping"]["groups"]["ton_validators"] in host["groups"]:
+                host["groups"].remove(cfg.config["mapping"]["groups"]["ton_validators"])
+            if cfg.config["mapping"]["groups"]["ton_nodes"] not in host["groups"]:
+                host["groups"].append(cfg.config["mapping"]["groups"]["ton_nodes"])
 
-        if groups != hdata[element]["groups"] or tags != hdata[element]["tags"]:
-            cfg.log.log(os.path.basename(__file__), 3, "Updating node {}.".format(element))
-            update_node(cfg, hdata[element], groups, tags)
+        if host != hdata[adnl]:
+            cfg.log.log(os.path.basename(__file__), 3, "Updating node {}.".format(adnl))
+            zt.update_host(cfg, host, hdata[adnl])
             stats["hosts_updated"] += 1
 
     cfg.log.log(os.path.basename(__file__), 2, "Run completed, added: {}, updated: {}".format(stats["hosts_added"],stats["hosts_updated"]))
@@ -116,6 +116,7 @@ def fetch_hosts(cfg, groups):
         "params": {
             "output": "extend",
             "groupids": groups,
+            "tags": [{"tag": "c_origin", "value": "validator_sync"}],
             "selectGroups": "extend",
             "selectMacros": "extend",
             "selectTags": "extend"
@@ -135,6 +136,7 @@ def fetch_hosts(cfg, groups):
         if adnl:
             record = {
                 "hostid": host["hostid"],
+                "status": host["status"],
                 "groups": [],
                 "macros": host["macros"],
                 "tags": host["tags"],
@@ -151,7 +153,7 @@ def fetch_hosts(cfg, groups):
 
     return result
 
-def add_node(cfg, adnl, wallet, groups, templates):
+def add_node(cfg, adnl, wallet, groups, templates, cycle_id):
     cfg.log.log(os.path.basename(__file__), 3, "Adding host with ADNL {}".format(adnl))
 
     payload = {
@@ -197,6 +199,10 @@ def add_node(cfg, adnl, wallet, groups, templates):
                     {
                         "macro": "{$UPDATED}",
                         "value": str(gt.get_timestamp())
+                    },
+                    {
+                        "macro": "{$LAST.CYCLE.ID}",
+                        "value": str(cycle_id)
                     }
                 ],
             "groups": [],
@@ -216,54 +222,6 @@ def add_node(cfg, adnl, wallet, groups, templates):
         sys.exit(1)
 
     return rs["result"]["hostids"][0]
-
-def update_node(cfg, host, groups, tags):
-    cfg.log.log(os.path.basename(__file__), 3, "Updating host with ID {}".format(host["hostid"]))
-
-    payload = {
-        "jsonrpc": "2.0",
-        "method": "host.update",
-        "params": {
-            "hostid": str(host["hostid"]),
-            "groups": [],
-            "tags": []
-        },
-        "auth": cfg.config["zabbix"]["api_token"],
-        "id": 1
-    }
-    for element in groups:
-        payload["params"]["groups"].append({"groupid": element})
-
-    for element in tags:
-        payload["params"]["tags"].append({"tag": element["tag"], "value": element["value"]})
-
-    rs = zt.execute_api_query(cfg, payload)
-    if not rs:
-        cfg.log.log(os.path.basename(__file__), 1, "Failed to update host with hostid {}".format(host["hostid"]))
-        sys.exit(1)
-
-    cfg.log.log(os.path.basename(__file__), 3, "Bumping updated macro")
-    element = next((chunk for chunk in host["macros"] if chunk["macro"] == "{$UPDATED}"), None)
-
-    if element:
-        payload = {
-            "jsonrpc": "2.0",
-            "method": "usermacro.update",
-            "params": {
-                "hostmacroid": str(element["hostmacroid"]),
-                "value": str(gt.get_timestamp())
-            },
-            "auth": cfg.config["zabbix"]["api_token"],
-            "id": 1
-        }
-        rs = zt.execute_api_query(cfg, payload)
-        if not rs:
-            cfg.log.log(os.path.basename(__file__), 1, "Failed to update macro with hostmacroid {}".format(element["hostmacroid"]))
-
-    else:
-        cfg.log.log(os.path.basename(__file__), 3, "Updated macro not found")
-
-    return True
 
 if __name__ == '__main__':
     run()

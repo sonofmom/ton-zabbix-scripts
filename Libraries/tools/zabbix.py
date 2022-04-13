@@ -1,3 +1,5 @@
+import Libraries.tools.general as gt
+
 import requests
 import os
 
@@ -59,11 +61,84 @@ def fetch_hosts(cfg, groups, identifier):
     return result
 
 
-def set_tag(tags, tag, value):
-    i = next((index for (index, chunk) in enumerate(tags) if chunk["tag"] == tag), None)
+def update_host(cfg, host, original):
+    cfg.log.log(os.path.basename(__file__), 3, "Updating host with ID {}".format(host["hostid"]))
+
+    set_macro(host["macros"], "{$UPDATED}", str(gt.get_timestamp()))
+
+    payload = {
+        "jsonrpc": "2.0",
+        "method": "host.update",
+        "params": {
+            "hostid": str(host["hostid"]),
+            "status": host["status"],
+            "groups": [],
+            "tags": host["tags"]
+        },
+        "auth": cfg.config["zabbix"]["api_token"],
+        "id": 1
+    }
+    for element in host["groups"]:
+        payload["params"]["groups"].append({"groupid": element})
+
+    rs = execute_api_query(cfg, payload)
+    if not rs:
+        cfg.log.log(os.path.basename(__file__), 1, "Failed to update host with hostid {}".format(host["hostid"]))
+        return None
+
+    cfg.log.log(os.path.basename(__file__), 3, "Updating macros")
+    for macro in host["macros"]:
+        if not "hostmacroid" in macro:
+            payload = {
+                "jsonrpc": "2.0",
+                "method": "usermacro.create",
+                "params": {
+                    "hostid": str(host["hostid"]),
+                    "macro": macro["macro"],
+                    "value": macro["value"]
+                },
+                "auth": cfg.config["zabbix"]["api_token"],
+                "id": 1
+            }
+            rs = execute_api_query(cfg, payload)
+            if not rs:
+                cfg.log.log(os.path.basename(__file__), 1,
+                            "Failed to add macro '{}' with value '{}'".format(macro["macro"],macro["value"]))
+
+        else:
+            omacro = next((chunk for chunk in original["macros"] if chunk["hostmacroid"] == macro["hostmacroid"]), None)
+            if omacro and omacro["value"] != macro["value"]:
+                payload = {
+                    "jsonrpc": "2.0",
+                    "method": "usermacro.update",
+                    "params": {
+                        "hostmacroid": str(macro["hostmacroid"]),
+                        "value": str(macro["value"])
+                    },
+                    "auth": cfg.config["zabbix"]["api_token"],
+                    "id": 1
+                }
+                rs = execute_api_query(cfg, payload)
+                if not rs:
+                    cfg.log.log(os.path.basename(__file__), 1,
+                                "Failed to update macro with hostmacroid {}".format(macro["hostmacroid"]))
+
+    return True
+
+def set_tag(tags, id, value):
+    i = next((index for (index, chunk) in enumerate(tags) if chunk["tag"] == id), None)
     if (i):
         tags[i]["value"] = value
     else:
-        tags.append({"tag": tag, "value": value})
+        tags.append({"tag": id, "value": value})
 
     return tags
+
+def set_macro(macros, id, value):
+    i = next((index for (index, chunk) in enumerate(macros) if chunk["macro"] == id), None)
+    if i != None:
+        macros[i]["value"] = value
+    else:
+        macros.append({"macro": id, "value": value})
+
+    return macros

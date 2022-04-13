@@ -12,7 +12,7 @@
   },
   "thresholds": {
     "stale_validators_disable": 131072,
-    "stale_validators_remove": 262144
+    "stale_validators_remove": 131072
   },
   "mapping": {
     "groups": {
