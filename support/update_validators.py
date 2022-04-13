@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 #
-
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
@@ -12,6 +11,7 @@ import Libraries.tools.general as gt
 import Libraries.tools.zabbix as zt
 import Classes.AppConfig as AppConfig
 import requests
+import copy
 
 def run():
     description = 'Fetches actual list of validators and performs sync with zabbix'
@@ -71,7 +71,7 @@ def run():
 
     cfg.log.log(os.path.basename(__file__), 3, "Scanning existing nodes")
     for adnl in hdata:
-        host = hdata[adnl].copy()
+        host = copy.deepcopy(hdata[adnl])
         if adnl in validators:
             if cfg.config["mapping"]["groups"]["ton_nodes"] in host["groups"]:
                 host["groups"].remove(cfg.config["mapping"]["groups"]["ton_nodes"])
