@@ -6,13 +6,12 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
 import argparse
-import datetime
 import Libraries.arguments as ar
 import Libraries.tools.general as gt
 import Libraries.tools.zabbix as zt
 import Classes.AppConfig as AppConfig
 import requests
-import json
+import copy
 
 def run():
     description = 'Fetches list of dht servers from network config and performs sync with zabbix'
@@ -22,7 +21,7 @@ def run():
     cfg = AppConfig.AppConfig(parser.parse_args())
 
     stats = {
-        "servers": 0,
+        "nodes": 0,
         "hosts_known": 0,
         "hosts_updated": 0,
         "hosts_added": 0,
@@ -36,88 +35,67 @@ def run():
         cfg.log.log(os.path.basename(__file__), 1, "Could not retrieve network config: " + str(e))
         sys.exit(1)
 
-    servers = {}
-    for element in rs["dht"]["static_nodes"]["nodes"]:
-        servers[element["id"]["key"]] = element
+    if len(rs["dht"]["static_nodes"]["nodes"]) > 0:
+        nodes = {}
+        # We identify DHT nodes by ip:port combination
+        #
+        for element in rs["dht"]["static_nodes"]["nodes"]:
+            nodes["{}.{}".format(gt.dec2ip(element["addr_list"]["addrs"][0]["ip"]),element["addr_list"]["addrs"][0]["port"])] = element
+    else:
+        cfg.log.log(os.path.basename(__file__), 1, "Network config contains no nodes")
+        sys.exit(1)
 
-    stats["servers"] = len(servers)
-    cfg.log.log(os.path.basename(__file__), 3, "Retrieved {} DHT servers.".format(stats["servers"]))
+    stats["nodes"] = len(nodes)
+
+    cfg.log.log(os.path.basename(__file__), 3, "Retrieved {} DHT servers.".format(stats["nodes"]))
 
     cfg.log.log(os.path.basename(__file__), 3, "Fetching list of hosts in zabbix.")
-    hdata = zt.fetch_hosts(cfg, [cfg.config["mapping"]["groups"]["ton_nodes"]], '{$NODE.ADNL}')
-    if hdata is None:
+    rs = zt.fetch_hosts(cfg, [cfg.config["mapping"]["groups"]["ton_public_dht_servers"]])
+    if rs is None:
         cfg.log.log(os.path.basename(__file__), 1, "Could not fetch list of hosts.")
         sys.exit(1)
+
+    # Again, we identify hosts by ip:port
+    hdata = {}
+    for element in rs:
+        port = next((chunk for chunk in element["macros"] if chunk["macro"] == "{$DHT.PORT}"), None)
+        if port:
+            hdata["{}.{}".format(element["interfaces"][0]["ip"], port["value"])] = element
+
     stats["hosts_known"] = len(hdata)
     cfg.log.log(os.path.basename(__file__), 3, "Retrieved {} hosts.".format(stats["hosts_known"]))
 
-    for element in servers:
-        if element not in hdata and servers[element]["addr_list"]["addrs"][0]["ip"] != 2130706433:
-            cfg.log.log(os.path.basename(__file__), 3, "Adding node {}.".format(element))
-            rs = add_node(cfg,servers[element])
-            if not rs:
-                cfg.log.log(os.path.basename(__file__), 1, "Could not add host.")
-                sys.exit(1)
 
-            stats["hosts_added"] += 1
-
-    sys.exit(0)
-
-
-    cfg.log.log(os.path.basename(__file__), 3, "Checking for nodes not known to zabbix")
-    for element in validators:
+    # Scan nodes from network config, add or update key as needed
+    #
+    for element in nodes:
         if element not in hdata:
-            cfg.log.log(os.path.basename(__file__), 3, "Adding node {}.".format(element))
-            rs = add_node(cfg,element,
-                         [
-                             cfg.config["mapping"]["groups"]["ton_validators"]
-                         ], [
-                             cfg.config["mapping"]["templates"]["ton_node_telemetry"],
-                             cfg.config["mapping"]["templates"]["ton_node_validator"],
-                         ])
-            if not rs:
-                cfg.log.log(os.path.basename(__file__), 1, "Could not add host.")
-                sys.exit(1)
+            if nodes[element]["addr_list"]["addrs"][0]["ip"] != 2130706433:
+                cfg.log.log(os.path.basename(__file__), 3, "Adding node {}.".format(element))
+                rs = add_node(cfg,nodes[element])
+                if not rs:
+                    cfg.log.log(os.path.basename(__file__), 1, "Could not add host.")
+                    sys.exit(1)
 
-            stats["hosts_added"] += 1
-
-    cfg.log.log(os.path.basename(__file__), 3, "Scanning existing nodes")
-    for element in hdata:
-        groups = hdata[element]["groups"].copy()
-        if element in validators:
-            if cfg.config["mapping"]["groups"]["ton_nodes"] in groups:
-                groups.remove(cfg.config["mapping"]["groups"]["ton_nodes"])
-            if cfg.config["mapping"]["groups"]["ton_validators"] not in groups:
-                groups.append(cfg.config["mapping"]["groups"]["ton_validators"])
+                stats["hosts_added"] += 1
         else:
-            if cfg.config["mapping"]["groups"]["ton_validators"] in groups:
-                groups.remove(cfg.config["mapping"]["groups"]["ton_validators"])
-            if cfg.config["mapping"]["groups"]["ton_nodes"] not in groups:
-                groups.append(cfg.config["mapping"]["groups"]["ton_nodes"])
+            host = copy.deepcopy(hdata[element])
+            key = next((chunk for chunk in host["macros"] if chunk["macro"] == "{$DHT.KEY}"), None)
+            if not key or key["value"] != nodes[element]["id"]["key"]:
+                zt.set_macro(host["macros"], "{$DHT.KEY}", str(nodes[element]["id"]["key"]))
 
-        if groups != hdata[element]["groups"]:
-            cfg.log.log(os.path.basename(__file__), 3, "Updating node {}.".format(element))
-            update_node(cfg, hdata[element], groups)
-            stats["hosts_updated"] += 1
+            if host != hdata[element]:
+                cfg.log.log(os.path.basename(__file__), 3, "Updating node {}.".format(element))
+                zt.update_host(cfg, host, hdata[element])
+                stats["hosts_updated"] += 1
 
-    cfg.log.log(os.path.basename(__file__), 2, "Run completed, added: {}, updated: {}".format(stats["hosts_added"],stats["hosts_updated"]))
+    # Scan nodes from zabbix, remove if unknown
+    #
+    for host in hdata:
+        if host not in nodes:
+            zt.delete_host(cfg, hdata[host])
+
     sys.exit(0)
-
-def fetch_validation_cycle(cfg):
-    cfg.log.log(os.path.basename(__file__), 3, 'Fetching validation cycles list from elections server')
-    try:
-        rs = requests.get("{}/getValidationCycles?return_participants=true&offset=0&limit=2".format(cfg.config["elections"]["url"])).json()
-    except Exception as e:
-        cfg.log.log(os.path.basename(__file__), 1, "Could not perform elections request: " + str(e))
-        sys.exit(1)
-
-    cfg.log.log(os.path.basename(__file__), 3, "Looking for active cycle")
-    dt = datetime.datetime.now(datetime.timezone.utc)
-    now = dt.replace(tzinfo=datetime.timezone.utc).timestamp()
-    for record in rs:
-        if record["cycle_info"]["utime_since"] < now and record["cycle_info"]["utime_until"] >= now:
-            return record
-
 
 def add_node(cfg, server_data):
     cfg.log.log(os.path.basename(__file__), 3, "Adding host with KEY {}".format(server_data["id"]["key"]))
@@ -129,12 +107,11 @@ def add_node(cfg, server_data):
         cfg.config["mapping"]["templates"]["ton_dht_server"]
     ]
 
-
     payload = {
         "jsonrpc": "2.0",
         "method": "host.create",
         "params": {
-            "host": "TON DHT node {}".format(gt.dec2ip(server_data["addr_list"]["addrs"][0]["ip"])),
+            "host": "TON DHT node {}.{}".format(gt.dec2ip(server_data["addr_list"]["addrs"][0]["ip"]),server_data["addr_list"]["addrs"][0]["port"]),
             "interfaces":
                 [
                     {
@@ -149,7 +126,7 @@ def add_node(cfg, server_data):
             "tags": [
                 {
                     "tag": "c_network",
-                    "value": "mainnet"
+                    "value": cfg.config["net"]
                 },
                 {
                     "tag": "c_stage",
@@ -192,50 +169,6 @@ def add_node(cfg, server_data):
         sys.exit(1)
 
     return rs["result"]["hostids"][0]
-
-def update_node(cfg, host, groups):
-    cfg.log.log(os.path.basename(__file__), 3, "Updating host with ID {}".format(host["hostid"]))
-
-    payload = {
-        "jsonrpc": "2.0",
-        "method": "host.update",
-        "params": {
-            "hostid": str(host["hostid"]),
-            "groups": []
-        },
-        "auth": cfg.config["zabbix"]["api_token"],
-        "id": 1
-    }
-    for group in groups:
-        payload["params"]["groups"].append({"groupid": group})
-
-    rs = zt.execute_api_query(cfg, payload)
-    if not rs:
-        cfg.log.log(os.path.basename(__file__), 1, "Failed to update host with hostid {}".format(host["hostid"]))
-        sys.exit(1)
-
-    cfg.log.log(os.path.basename(__file__), 3, "Bumping updated macro")
-    element = next((chunk for chunk in host["macros"] if chunk["macro"] == "{$UPDATED}"), None)
-
-    if element:
-        payload = {
-            "jsonrpc": "2.0",
-            "method": "usermacro.update",
-            "params": {
-                "hostmacroid": str(element["hostmacroid"]),
-                "value": str(gt.get_timestamp())
-            },
-            "auth": cfg.config["zabbix"]["api_token"],
-            "id": 1
-        }
-        rs = zt.execute_api_query(cfg, payload)
-        if not rs:
-            cfg.log.log(os.path.basename(__file__), 1, "Failed to update macro with hostmacroid {}".format(element["hostmacroid"]))
-
-    else:
-        cfg.log.log(os.path.basename(__file__), 3, "Updated macro not found")
-
-    return True
 
 if __name__ == '__main__':
     run()

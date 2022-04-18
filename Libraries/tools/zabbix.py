@@ -20,7 +20,7 @@ def execute_api_query(cfg, payload, post=False):
 
     return rs
 
-def fetch_hosts(cfg, groups, identifier):
+def fetch_hosts(cfg, groups, identifier=None):
     payload = {
         "jsonrpc": "2.0",
         "method": "host.get",
@@ -41,24 +41,30 @@ def fetch_hosts(cfg, groups, identifier):
         cfg.log.log(os.path.basename(__file__), 1, "Could not fetch host list")
         return None
 
-    result = {}
-    for host in rs["result"]:
-        macro = next((chunk for chunk in host["macros"] if chunk["macro"] == identifier),
-                         None)
-        if macro:
-            record = {
-                "hostid": host["hostid"],
-                "groups": [],
-                "macros": host["macros"],
-                "tags": host["tags"],
-                "interfaces": host["interfaces"]
-            }
-            for group in host["groups"]:
-                record["groups"].append(int(group["groupid"]))
+    if "error" in rs:
+        cfg.log.log(os.path.basename(__file__), 1, "Could not execute zabbix query: {}".format(rs["error"]["data"]))
+        return None
 
-            result[macro["value"]] = record
+    if not identifier:
+        return rs["result"]
+    else:
+        result = {}
+        for host in rs["result"]:
+            macro = next((chunk for chunk in host["macros"] if chunk["macro"] == identifier),
+                             None)
+            if macro:
+                record = {
+                    "hostid": host["hostid"],
+                    "groups": [],
+                    "macros": host["macros"],
+                    "tags": host["tags"],
+                    "interfaces": host["interfaces"]
+                }
+                for group in host["groups"]:
+                    record["groups"].append(int(group["groupid"]))
 
-    return result
+                result[macro["value"]] = record
+        return result
 
 
 def update_host(cfg, host, original):
@@ -79,7 +85,10 @@ def update_host(cfg, host, original):
         "id": 1
     }
     for element in host["groups"]:
-        payload["params"]["groups"].append({"groupid": element})
+        if isinstance(element, dict):
+            payload["params"]["groups"].append(element)
+        else:
+            payload["params"]["groups"].append({"groupid": element})
 
     rs = execute_api_query(cfg, payload)
     if not rs:
