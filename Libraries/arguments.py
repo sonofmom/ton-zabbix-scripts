@@ -58,3 +58,10 @@ def set_standard_args_file(parser):
                         dest='verbosity',
                         action='store',
                         help='Verbosity 0 - 3')
+
+def set_standard_args_output(parser):
+    parser.add_argument('-o', '--output',
+                        required=True,
+                        dest='output',
+                        action='store',
+                        help='File for result output - REQUIRED')

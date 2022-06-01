@@ -1,0 +1,10 @@
+{
+  "elections": {
+    "url": "https://elections.toncenter.com"
+  },
+  "telemetry": {
+    "url": "telemetry.url",
+    "api_key": "api.key",
+    "offset": 120
+  }
+}
