@@ -50,7 +50,7 @@ def run():
     cfg.log.log(os.path.basename(__file__), 3, "Retrieved {} DHT servers.".format(stats["nodes"]))
 
     cfg.log.log(os.path.basename(__file__), 3, "Fetching list of hosts in zabbix.")
-    rs = zt.fetch_hosts(cfg, [cfg.config["mapping"]["groups"]["ton_public_dht_servers"]])
+    rs = zt.fetch_hosts(cfg, [cfg.config["mapping"]["groups"]["ton_public_dht_servers"]], {"c_network": cfg.config["net"]})
     if rs is None:
         cfg.log.log(os.path.basename(__file__), 1, "Could not fetch list of hosts.")
         sys.exit(1)

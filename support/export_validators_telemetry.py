@@ -28,7 +28,10 @@ def run():
 
     validators = {}
     for element in cycle["cycle_info"]["validators"]:
-        validators[element["adnl_addr"]] = element["wallet_address"]
+        if "wallet_address" in element:
+            validators[element["adnl_addr"]] = element["wallet_address"]
+        else:
+            validators[element["adnl_addr"]] = None
 
     cfg.log.log(os.path.basename(__file__), 3, "Retrieved {} validators.".format(len(validators)))
 

@@ -20,7 +20,7 @@ def execute_api_query(cfg, payload, post=False):
 
     return rs
 
-def fetch_hosts(cfg, groups, identifier=None):
+def fetch_hosts(cfg, groups, tags=None, identifier=None):
     payload = {
         "jsonrpc": "2.0",
         "method": "host.get",
@@ -35,6 +35,11 @@ def fetch_hosts(cfg, groups, identifier=None):
         "auth": cfg.config["zabbix"]["api_token"],
         "id": 1
     }
+
+    if tags is not None:
+        payload["params"]["tags"] = []
+        for element in tags:
+            payload["params"]["tags"].append({"tag": element, "value": tags[element], "operator": 1})
 
     rs = execute_api_query(cfg, payload)
     if not rs:
